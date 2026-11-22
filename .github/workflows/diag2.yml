@@ -1,0 +1,27 @@
+name: diag2
+
+on:
+  push:
+    branches: [main]
+
+jobs:
+  probe:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+      pages: write
+      id-token: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: enable pages
+        env:
+          T: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          { echo POST-ENABLE; curl -s -w '\nHTTP %{http_code}\n' -X POST -H "Authorization: Bearer $T" -H "Accept: application/vnd.github+json" -H "X-GitHub-Api-Version: 2022-11-28" -d '{"build_type":"workflow"}' https://api.github.com/repos/DTerji74/minecraft-web-1.20.1/pages; echo GET-AFTER; curl -s -w '\nHTTP %{http_code}\n' -H "Authorization: Bearer $T" -H "Accept: application/vnd.github+json" https://api.github.com/repos/DTerji74/minecraft-web-1.20.1/pages; } > diag2.txt 2>&1
+      - name: commit
+        run: |
+          git config user.name mcbot
+          git config user.email mcbot@users.noreply.github.com
+          git add diag2.txt
+          git commit -m diag2 || true
+          git push
