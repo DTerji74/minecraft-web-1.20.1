@@ -1,25 +1,11 @@
-name: diag-pages
+name: pages-note
 
 on:
-  push:
-    branches: [main]
+  workflow_dispatch:
 
 jobs:
-  diag:
+  note:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
     steps:
-      - uses: actions/checkout@v4
-      - name: probe
-        env:
-          T: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          { echo GET-BEFORE; curl -s -w '\nHTTP %{http_code}\n' -H "Authorization: Bearer $T" https://api.github.com/repos/DTerji74/minecraft-web-1.20.1/pages; echo POST-ENABLE; curl -s -w '\nHTTP %{http_code}\n' -X POST -H "Authorization: Bearer $T" -H "Accept: application/vnd.github+json" -d '{"build_type":"workflow"}' https://api.github.com/repos/DTerji74/minecraft-web-1.20.1/pages; echo GET-AFTER; curl -s -w '\nHTTP %{http_code}\n' -H "Authorization: Bearer $T" https://api.github.com/repos/DTerji74/minecraft-web-1.20.1/pages; } > diag.txt 2>&1
-      - name: commit
-        run: |
-          git config user.name mcbot
-          git config user.email mcbot@users.noreply.github.com
-          git add diag.txt
-          git commit -m diag || true
-          git push
+      - name: note
+        run: echo "GitHub Pages requires manual enablement in Settings > Pages (Source: GitHub Actions)."
