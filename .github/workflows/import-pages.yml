@@ -1,0 +1,50 @@
+name: import-and-deploy
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+jobs:
+  import:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v4
+      - name: fetch code parts
+        run: |
+          curl -sSL -o game0.b64 "https://aka.doubaocdn.com/s/2VmRsr85p0"
+          curl -sSL -o game1.b64 "https://aka.doubaocdn.com/s/g7LQzdi5FN"
+          curl -sSL -o game2.b64 "https://aka.doubaocdn.com/s/A2aw52vVKa"
+          curl -sSL -o game3.b64 "https://aka.doubaocdn.com/s/SOzjhCbFK5"
+          cat game0.b64 game1.b64 game2.b64 game3.b64 > all.b64
+          python3 -c "import base64,gzip; s=open('all.b64').read(); g=gzip.decompress(base64.b64decode(''.join(s.split()))); print('decoded', len(g)); assert len(g) > 100000"
+          rm -f all.b64
+      - name: commit
+        run: |
+          git config user.name mcbot
+          git config user.email mcbot@users.noreply.github.com
+          git add game0.b64 game1.b64 game2.b64 game3.b64
+          if git diff --cached --quiet; then echo no-change; else git commit -m "import game code"; git push; fi
+
+  deploy:
+    needs: import
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.dep.outputs.page_url }}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/configure-pages@v5
+        with:
+          enablement: true
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          path: .
+      - id: dep
+        uses: actions/deploy-pages@v4
