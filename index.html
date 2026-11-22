@@ -1,0 +1,296 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no">
+<title>我的世界 · 网页版 (Minecraft Web)</title>
+<style>
+  :root{
+    --gui: 2;
+    --mc-font: "Microsoft YaHei","PingFang SC","Hiragino Sans GB","Noto Sans SC",system-ui,sans-serif;
+    --panel:#c6c6c6; --slot:#8b8b8b; --border-dark:#373737; --border-light:#ffffff;
+    --text:#ffffff; --text-shadow:#3f3f3f;
+  }
+  *{box-sizing:border-box; margin:0; padding:0; -webkit-tap-highlight-color:transparent;}
+  html,body{width:100%;height:100%;overflow:hidden;background:#000;}
+  body{font-family:var(--mc-font); color:#fff; user-select:none;}
+  canvas{display:block;}
+  #game-canvas-wrap{position:fixed;inset:0;}
+  #game-canvas{width:100%;height:100%;}
+
+  /* ---------- 通用 MC 风格排版 ---------- */
+  .mc-text{font-size:8px;line-height:1.45;text-shadow:1.5px 1.5px 0 var(--text-shadow);letter-spacing:.4px;}
+  .ui-scale{zoom:var(--gui);}
+  .screen{position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;z-index:20;}
+  .hidden{display:none !important;}
+
+  /* 按钮 */
+  .mc-btn{
+    display:flex;align-items:center;justify-content:center;
+    width:100%;height:24px;margin:4px 0;cursor:pointer;
+    font-family:var(--mc-font);font-size:8px;color:#f2f2f2;letter-spacing:.5px;
+    text-shadow:2px 2px 0 #333;
+    background:#6b6b6b;
+    border:2px solid #000;
+    box-shadow:inset -2px -2px 0 #444, inset 2px 2px 0 #a5a5a5;
+    transition:background .12s;
+    position:relative;overflow:hidden;
+  }
+  .mc-btn:hover{background:#7f8fbf;box-shadow:inset -2px -2px 0 #3b466b, inset 2px 2px 0 #b8c3e8;}
+  .mc-btn:active{box-shadow:inset 2px 2px 0 #3b466b, inset -2px -2px 0 #b8c3e8;}
+  .mc-btn.disabled{color:#8a8a8a;background:#575757;cursor:default;}
+  .mc-btn.small{height:26px;font-size:7px;width:auto;min-width:70px;padding:0 10px;margin:2px 4px;}
+  .mc-btn.wide{width:320px;}
+
+  /* 面板 */
+  .panel{
+    background:var(--panel);
+    border:2px solid #000;
+    box-shadow:inset -2px -2px 0 #555, inset 2px 2px 0 #e8e8e8;
+    padding:12px;
+    color:#3f3f3f;
+  }
+  .panel .title{font-size:8px;color:#3f3f3f;text-shadow:1px 1px 0 #fff;margin-bottom:8px;text-align:left;}
+  .slot{
+    width:36px;height:36px;background:var(--slot);
+    border:0;
+    box-shadow:inset 2px 2px 0 #373737, inset -2px -2px 0 #ffffff;
+    position:relative;cursor:pointer;
+    display:flex;align-items:center;justify-content:center;
+  }
+  .slot:hover{background:#a0a0a0;}
+  .slot img{width:32px;height:32px;image-rendering:pixelated;pointer-events:none;}
+  .slot .count{
+    position:absolute;right:1px;bottom:-2px;font-size:7px;color:#fff;
+    text-shadow:1.5px 1.5px 0 #3f3f3f;pointer-events:none;
+  }
+  .slot .dura{position:absolute;left:3px;bottom:3px;height:2px;background:#3f3f3f;}
+  .slot-grid{display:grid;gap:2px;}
+  .inv-block{display:flex;flex-direction:column;gap:2px;}
+  .row{display:flex;gap:2px;}
+  .craft-arrow{width:22px;display:flex;align-items:center;justify-content:center;color:#8b8b8b;font-size:14px;}
+  .emc-line{font-size:7px;color:#3f3f3f;text-shadow:1px 1px 0 #fff;margin:2px 0 6px;}
+  .tooltip{
+    position:fixed;background:rgba(16,0,16,.94);border:2px solid #2d0a63;
+    color:#fff;font-size:7px;padding:4px 6px;pointer-events:none;z-index:99;
+    box-shadow:inset 0 0 0 1px #4b2b8f;max-width:220px;
+  }
+
+  /* ---------- 标题画面 ---------- */
+  #screen-title{justify-content:flex-end;padding-bottom:6vh;background:linear-gradient(180deg,rgba(0,0,0,.55) 0%,rgba(0,0,0,.25) 45%,rgba(0,0,0,.72) 100%);}
+  #title-logo{width:460px;max-width:78vw;image-rendering:pixelated;filter:drop-shadow(0 6px 0 rgba(0,0,0,.55));}
+  #splash{
+    position:absolute;right:6%;top:31%;color:#ffff00;font-size:9px;
+    text-shadow:2px 2px 0 #3f3f00;transform:rotate(-18deg);animation:splashPulse .6s infinite alternate;
+  }
+  @keyframes splashPulse{from{transform:rotate(-18deg) scale(1)}to{transform:rotate(-18deg) scale(1.07)}}
+  #title-buttons{width:300px;margin-top:2vh;}
+  #title-footer{position:absolute;left:10px;bottom:8px;font-size:7px;color:#d0d0d0;text-shadow:2px 2px 0 #000;}
+  #title-version{position:absolute;right:10px;bottom:8px;font-size:7px;color:#d0d0d0;text-shadow:2px 2px 0 #000;}
+
+  /* ---------- 世界列表 ---------- */
+  #screen-worlds{background:rgba(0,0,0,.45);}
+  .world-list{width:min(720px,92vw);max-height:52vh;overflow-y:auto;}
+  .world-item{
+    display:flex;align-items:center;gap:10px;padding:6px;margin-bottom:4px;
+    background:rgba(0,0,0,.45);border:2px solid #000;cursor:pointer;
+  }
+  .world-item:hover{background:rgba(80,80,120,.6);}
+  .world-thumb{width:56px;height:56px;background:#3a3a3a;border:1px solid #000;image-rendering:pixelated;}
+  .world-meta{flex:1;text-align:left;}
+  .world-name{font-size:9px;color:#fff;text-shadow:2px 2px 0 #000;}
+  .world-sub{font-size:7px;color:#c8c8c8;text-shadow:1px 1px 0 #000;}
+  .empty-worlds{font-size:8px;color:#bbb;padding:20px;text-align:center;text-shadow:2px 2px 0 #000;}
+
+  /* ---------- 选项 ---------- */
+  #screen-options{background:rgba(0,0,0,.55);}
+  .options-panel{width:min(560px,94vw);max-height:80vh;overflow-y:auto;}
+  .opt-row{display:flex;align-items:center;justify-content:space-between;margin:5px 0;font-size:7.5px;color:#3f3f3f;text-shadow:1px 1px 0 #fff;}
+  .opt-row .val{color:#555;}
+  .mc-range{-webkit-appearance:none;width:150px;height:8px;background:#8b8b8b;box-shadow:inset 2px 2px 0 #373737, inset -2px -2px 0 #fff;outline:none;}
+  .mc-range::-webkit-slider-thumb{-webkit-appearance:none;width:10px;height:16px;background:#c6c6c6;border:1px solid #000;box-shadow:inset 1px 1px 0 #fff;}
+  .opt-cols{display:grid;grid-template-columns:1fr 1fr;gap:0 18px;}
+  .opt-group{font-size:8px;margin:10px 0 2px;color:#3f3f3f;text-shadow:1px 1px 0 #fff;}
+
+  /* ---------- HUD ---------- */
+  #hud{position:fixed;inset:0;pointer-events:none;z-index:10;font-family:var(--mc-font);}
+  #hud-inner{
+    position:absolute;left:50%;bottom:4px;transform:translateX(-50%) scale(var(--gui));
+    transform-origin:bottom center;display:flex;flex-direction:column;align-items:center;gap:2px;width:214px;
+  }
+  #crosshair{position:absolute;left:50%;top:50%;width:18px;height:18px;transform:translate(-50%,-50%);mix-blend-mode:difference;}
+  #crosshair:before,#crosshair:after{content:"";position:absolute;background:#fff;}
+  #crosshair:before{left:8px;top:0;width:2px;height:18px;}
+  #crosshair:after{top:8px;left:0;height:2px;width:18px;}
+  #hotbar{display:flex;gap:1px;padding:2px;background:rgba(0,0,0,.55);border:1px solid #000;}
+  .hslot{width:22px;height:22px;background:rgba(139,139,139,.55);box-shadow:inset 2px 2px 0 rgba(55,55,55,.8),inset -2px -2px 0 rgba(255,255,255,.35);display:flex;align-items:center;justify-content:center;position:relative;}
+  .hslot img{width:19px;height:19px;image-rendering:pixelated;}
+  .hslot .count{position:absolute;right:0;bottom:-1px;font-size:6px;color:#fff;text-shadow:1px 1px 0 #000;}
+  .hslot.sel{box-shadow:inset 0 0 0 2px #fff, inset 2px 2px 0 rgba(55,55,55,.8);}
+  #status-row{display:flex;justify-content:space-between;width:100%;}
+  #hearts,#hunger{display:flex;gap:1px;}
+  .icon{width:9px;height:9px;image-rendering:pixelated;background-size:contain;}
+  #xpbar{width:100%;height:3px;background:#1f2b0a;border:1px solid #000;}
+  #xpfill{height:100%;width:0;background:#7cf22b;}
+  #item-name{
+    font-size:8px;color:#fff;text-shadow:2px 2px 0 #3f3f3f;opacity:0;transition:opacity .3s;height:11px;
+  }
+  #minimap-wrap{
+    position:absolute;right:8px;top:8px;border:2px solid #000;background:#000;opacity:.92;
+    pointer-events:auto;
+  }
+  #minimap{width:96px;height:96px;image-rendering:pixelated;}
+  #minimap-label{position:absolute;left:0;top:0;font-size:6px;color:#fff;text-shadow:1px 1px 0 #000;padding:1px 2px;}
+  #debug-screen{
+    position:fixed;left:4px;top:4px;z-index:12;font-family:ui-monospace,Menlo,Consolas,monospace;
+    font-size:9px;line-height:1.35;color:#fff;text-shadow:1px 1px 0 #000;background:rgba(0,0,0,.35);
+    padding:3px 5px;white-space:pre;pointer-events:none;
+  }
+  #water-overlay{position:fixed;inset:0;background:rgba(30,60,160,.34);z-index:9;pointer-events:none;opacity:0;transition:opacity .2s;}
+  #hurt-overlay{position:fixed;inset:0;background:radial-gradient(circle,rgba(255,0,0,0) 40%,rgba(255,0,0,.55) 100%);z-index:9;pointer-events:none;opacity:0;}
+  #vignette{position:fixed;inset:0;pointer-events:none;z-index:8;box-shadow:inset 0 0 120px rgba(0,0,0,.45);}
+
+  /* ---------- 提示 / 加载 ---------- */
+  #toast{
+    position:fixed;left:50%;bottom:22%;transform:translateX(-50%);
+    background:rgba(0,0,0,.75);border:2px solid #000;color:#fff;font-size:8px;
+    padding:5px 12px;z-index:30;text-shadow:2px 2px 0 #000;opacity:0;transition:opacity .25s;pointer-events:none;
+  }
+  #loading{position:fixed;inset:0;background:#1a1a1a;z-index:40;display:flex;flex-direction:column;align-items:center;justify-content:center;gap:12px;}
+  #loading .bar{width:320px;height:10px;background:#3a3a3a;border:2px solid #000;}
+  #loading .bar i{display:block;height:100%;width:0;background:#7cf22b;transition:width .2s;}
+  #loading .txt{font-size:8px;color:#ddd;text-shadow:2px 2px 0 #000;}
+  .dirt-bg{
+    background-color:#6b4a2b;
+    background-image:radial-gradient(circle at 20% 30%,rgba(0,0,0,.28) 0 3px,transparent 4px),
+      radial-gradient(circle at 70% 65%,rgba(0,0,0,.25) 0 4px,transparent 5px);
+    background-size:32px 32px,48px 48px;
+  }
+
+  /* 死亡画面 */
+  #screen-death{background:rgba(110,0,0,.55);}
+  #screen-death .mc-text{font-size:22px;color:#fff;text-shadow:3px 3px 0 #3f0000;margin-bottom:14px;}
+
+  /* 提示条（成就/模组） */
+  .toast-mod{
+    position:fixed;right:12px;top:calc(112px + 0px);z-index:34;
+    background:rgba(0,0,0,.82);border:2px solid #000;padding:6px 10px;color:#fff;font-size:7px;
+    text-shadow:1px 1px 0 #000;animation:slideIn .3s ease-out;max-width:240px;
+  }
+  @keyframes slideIn{from{transform:translateX(120%);}to{transform:translateX(0);}}
+
+  /* 触屏控制 */
+  #touch-ui{position:fixed;inset:0;z-index:11;display:none;}
+  #touch-ui.on{display:block;}
+  #joy-base{position:absolute;left:18px;bottom:80px;width:110px;height:110px;border-radius:50%;background:rgba(255,255,255,.12);border:2px solid rgba(255,255,255,.3);}
+  #joy-knob{position:absolute;left:35px;top:35px;width:40px;height:40px;border-radius:50%;background:rgba(255,255,255,.35);}
+  .tbtn{position:absolute;width:58px;height:58px;border-radius:50%;background:rgba(255,255,255,.14);border:2px solid rgba(255,255,255,.3);display:flex;align-items:center;justify-content:center;font-size:9px;color:#fff;text-shadow:1px 1px 0 #000;pointer-events:auto;}
+  #tb-jump{right:22px;bottom:150px;}
+  #tb-mine{right:95px;bottom:92px;width:66px;height:66px;}
+  #tb-place{right:22px;bottom:80px;}
+  #tb-fly{right:22px;bottom:224px;}
+  #tb-inv{right:95px;bottom:174px;width:44px;height:44px;}
+  #tb-inv img{width:26px;height:26px;image-rendering:pixelated;}
+
+  /* ---------- JEI / 转化桌 ---------- */
+  .mc-input{
+    font-family:var(--mc-font);font-size:8px;color:#fff;background:#000;
+    border:2px solid #a0a0a0;box-shadow:inset 2px 2px 0 #3a3a3a;padding:4px 6px;outline:none;
+  }
+  .mc-input:focus{border-color:#fff;}
+  .jei-cell{
+    width:100%;aspect-ratio:1/1;background:#8b8b8b;display:flex;align-items:center;justify-content:center;
+    box-shadow:inset 1px 1px 0 #5a5a5a;cursor:pointer;position:relative;
+  }
+  .jei-cell:hover{background:#b8b8ff;}
+  .jei-cell img{width:88%;height:88%;image-rendering:pixelated;}
+  .emc-list{max-height:236px;overflow-y:auto;display:grid;grid-template-columns:repeat(4,1fr);gap:2px;}
+  .emc-item{
+    background:rgba(255,255,255,.35);border:1px solid rgba(0,0,0,.25);padding:2px;
+    display:flex;flex-direction:column;align-items:center;cursor:pointer;position:relative;
+  }
+  .emc-item:hover{background:#c9b8ff;}
+  .emc-item img{width:22px;height:22px;image-rendering:pixelated;}
+  .emc-item-name{font-size:6px;color:#2f2f2f;text-align:center;line-height:1.1;height:14px;overflow:hidden;width:100%;}
+  .emc-item-price{font-size:6px;color:#2a6a2a;font-weight:bold;}
+  .slot img{width:30px;height:30px;image-rendering:pixelated;}
+  #recipe-popup{position:fixed;left:50%;top:50%;transform:translate(-50%,-50%);z-index:120;}
+  #recipe-popup .panel{box-shadow:0 0 0 4px rgba(0,0,0,.4), inset -2px -2px 0 #555, inset 2px 2px 0 #e8e8e8;}
+</style>
+</head>
+<body>
+<div id="game-canvas-wrap"></div>
+
+<div id="vignette"></div>
+<div id="water-overlay"></div>
+<div id="hurt-overlay"></div>
+
+<div id="hud">
+  <div id="crosshair"></div>
+  <div id="minimap-wrap"><canvas id="minimap" width="96" height="96"></canvas><span id="minimap-label">小地图</span></div>
+  <div id="hud-inner">
+    <div id="item-name"></div>
+    <div id="status-row">
+      <div id="hearts"></div>
+      <div id="hunger"></div>
+    </div>
+    <div id="xpbar"><div id="xpfill"></div></div>
+    <div id="hotbar"></div>
+  </div>
+</div>
+
+<div id="debug-screen" class="hidden"></div>
+<div id="ui-root"></div>
+<div id="toast"></div>
+<div id="loading" class="hidden"><div class="txt" id="loading-text">正在生成世界…</div><div class="bar"><i id="loading-bar"></i></div></div>
+
+<div id="touch-ui">
+  <div id="joy-base"><div id="joy-knob"></div></div>
+  <div class="tbtn" id="tb-jump">跳跃</div>
+  <div class="tbtn" id="tb-mine">挖掘</div>
+  <div class="tbtn" id="tb-place">放置</div>
+  <div class="tbtn" id="tb-fly">飞行</div>
+  <div class="tbtn" id="tb-inv">背包</div>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/three@0.149.0/build/three.min.js"></script>
+<script>
+/* 网页版（GitHub Pages 版）：three.js 走 CDN，游戏代码以 gzip + base64 存放，运行时解压执行 */
+(function () {
+  var box = document.createElement('div');
+  box.textContent = '正在加载…';
+  box.style.cssText = 'position:fixed;inset:0;display:flex;align-items:center;justify-content:center;background:#000;color:#e8e8e8;font:14px monospace;z-index:99999';
+  document.body.appendChild(box);
+
+  function fail(msg) {
+    box.innerHTML = '<div style="text-align:center;line-height:2">加载失败：' + msg +
+      '<br><span style="font-size:12px;color:#aaa">请用电脑版 Chrome / Edge 打开；也可使用可离线运行的单文件版</span></div>';
+  }
+
+  if (typeof THREE === 'undefined') { fail('three.js 未能从 CDN 加载'); return; }
+  if (!('DecompressionStream' in window)) { fail('浏览器过旧，不支持 DecompressionStream'); return; }
+
+  var PARTS = ['game0.b64', 'game1.b64', 'game2.b64', 'game3.b64'];
+  Promise.all(PARTS.map(function (p) {
+    return fetch(p, { cache: 'no-store' }).then(function (r) {
+      if (!r.ok) throw new Error(p + ' HTTP ' + r.status);
+      return r.text();
+    });
+  })).then(function (texts) {
+    var b64 = texts.join('').replace(/\s+/g, '');
+    var raw = atob(b64);
+    var bin = new Uint8Array(raw.length);
+    for (var i = 0; i < raw.length; i++) bin[i] = raw.charCodeAt(i);
+    return new Response(new Blob([bin]).stream().pipeThrough(new DecompressionStream('gzip'))).text();
+  }).then(function (js) {
+    var url = URL.createObjectURL(new Blob([js], { type: 'text/javascript' }));
+    var sc = document.createElement('script');
+    sc.src = url;
+    sc.onload = function () { URL.revokeObjectURL(url); box.remove(); };
+    sc.onerror = function () { fail('游戏脚本执行出错'); };
+    document.body.appendChild(sc);
+  }).catch(function (e) { fail(e.message || String(e)); });
+})();
+</script>
+</body>
+</html>
